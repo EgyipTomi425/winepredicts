@@ -132,8 +132,8 @@ def simulated_annealing(model, X_min, X_max, max_iterations=1024, initial_temper
             best_input = current_input.clone()
 
         if(_%(1024/8)==0):
-            current_input_numpy = current_input.cpu().detach().numpy()  # Konvertálás NumPy tömbbé
-            new_input_numpy = new_input.cpu().detach().numpy()  # Konvertálás NumPy tömbbé
+            current_input_numpy = current_input.cpu().detach().numpy()
+            new_input_numpy = new_input.cpu().detach().numpy()
             print(f"Iteration: {_}, Temp: {round(temperature,4)}, Current Input: {[round(val, 2) for val in current_input_numpy]}, Pred: {round(current_output.item(), 2)}, New Input: {[round(val, 2) for val in new_input_numpy]}, Pred: {round(new_output.item(), 2)}")
 
         temperature*=.9921875
