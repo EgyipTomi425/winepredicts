@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+import torch.optim as optim
+from torch.optim.lr_scheduler import ExponentialLR
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from collections import deque
-import random
-import math
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,17 +28,17 @@ y_test_tensor = torch.tensor(y_test.values, dtype=torch.float32).view(-1, 1).to(
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 
-train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
-test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)
+train_loader = DataLoader(dataset=train_dataset, batch_size=16, shuffle=True)
+test_loader = DataLoader(dataset=test_dataset, batch_size=16, shuffle=False)
 
 class WineQualityNet(nn.Module):
     def __init__(self, dropout_rate=0.125):
         super(WineQualityNet, self).__init__()
-        self.fc1 = nn.Linear(11, 1024)  # 11 jellemző
+        self.fc1 = nn.Linear(11, 700)  # 11 jellemző
         self.dropout1 = nn.Dropout(dropout_rate)
-        self.fc2 = nn.Linear(1024, 1024)
+        self.fc2 = nn.Linear(700, 300)
         self.dropout2 = nn.Dropout(dropout_rate)
-        self.fc3 = nn.Linear(1024, 1)  # 1 kimenet (quality)
+        self.fc3 = nn.Linear(300, 1)  # 1 kimenet (quality)
 
         self.leaky_relu1 = nn.LeakyReLU(negative_slope=0.015625)
         self.leaky_relu2 = nn.LeakyReLU(negative_slope=0.015625)
@@ -51,7 +51,7 @@ class WineQualityNet(nn.Module):
         x = self.fc3(x)
         return x
 
-def train_model(model, criterion, optimizer, train_loader, test_loader, num_epochs=512, patience=16):
+def train_model(model, criterion, optimizer, scheduler, train_loader, test_loader, num_epochs=512, patience=16):
     best_loss = float('inf')
     best_epoch = -1
     best_train_loss = None
@@ -85,6 +85,9 @@ def train_model(model, criterion, optimizer, train_loader, test_loader, num_epoc
         test_loss /= len(test_loader.dataset)
         print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
 
+        # Tanulási ráta ütemező frissítése
+        scheduler.step()
+
         # Korai leállítás logikája és a legjobb modell mentése
         if test_loss < best_loss:
             best_loss = test_loss
@@ -101,7 +104,7 @@ def train_model(model, criterion, optimizer, train_loader, test_loader, num_epoc
                 model.load_state_dict(best_model_wts)
                 break
 
-    return model
+    return model, train_loss, test_loss
 
 def simulated_annealing(model, X_min, X_max, max_iterations=1024, initial_temperature=8.0):
     best_quality = float('-inf')
@@ -140,13 +143,19 @@ def simulated_annealing(model, X_min, X_max, max_iterations=1024, initial_temper
 
     return best_input
 
-model = WineQualityNet(dropout_rate=0.125).to(device)
+# Modell létrehozása és eszközre helyezése
+model = WineQualityNet().to(device)
 criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.0078125)
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 
-trained_model = train_model(model, criterion, optimizer, train_loader, test_loader)
+# ExponentialLR ütemező létrehozása
+scheduler = ExponentialLR(optimizer, gamma=0.75)
+
+# Tanítás
+trained_model, train_loss, test_loss = trained_model, train_loss, test_loss = train_model(model, criterion, optimizer, scheduler, train_loader, test_loader)
 
 total_params = sum(p.numel() for p in model.parameters())
+
 print(f'Total number of parameters: {total_params},\n')
 
 # Szimulált hűtés maximumkereséssel
@@ -170,3 +179,51 @@ for name, value in name_value_pairs:
 # Prediktált minőség kiíratása
 predicted_quality = model(best_input.unsqueeze(0)).item()
 print("Predicted Quality:", predicted_quality)
+
+# Ábrázolás
+import matplotlib.pyplot as plt
+
+# Sötét téma beállítása
+plt.style.use('dark_background')
+
+def plot_data_and_predictions(model, train_loader, test_loader, title_train, title_test, train_loss, test_loss):
+    model.eval()
+    with torch.no_grad():
+        # Tanító adathalmazra történő predikciók
+        predicted_values_train = []
+        for inputs, _ in train_loader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            predicted_values_train.extend(outputs.cpu().numpy())
+
+        # Tesztelő adathalmazra történő predikciók
+        predicted_values_test = []
+        for inputs, _ in test_loader:
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            predicted_values_test.extend(outputs.cpu().numpy())
+
+    # Tanító adathalmaz ábrázolása
+    plt.figure(figsize=(15, 6))
+    plt.subplot(1, 2, 1)
+    plt.scatter(range(len(predicted_values_train)), predicted_values_train, color='red', label='Predicted Values (Training)')
+    plt.scatter(range(len(y_train)), y_train, color='blue', label='True Values (Training)')
+    plt.xlabel('Index')
+    plt.ylabel('Quality')
+    plt.title(f"{title_train}\nTrain Loss: {train_loss:.4f}")
+    plt.legend()
+
+    # Tesztelő adathalmaz ábrázolása
+    plt.subplot(1, 2, 2)
+    plt.scatter(range(len(predicted_values_test)), predicted_values_test, color='red', label='Predicted Values (Testing)')
+    plt.scatter(range(len(y_test)), y_test, color='blue', label='True Values (Testing)')
+    plt.xlabel('Index')
+    plt.ylabel('Quality')
+    plt.title(f"{title_test}\nTest Loss: {test_loss:.4f}")
+    plt.legend()
+
+    plt.tight_layout()  # A grafikonok közötti térköz beállítása
+    plt.show()
+
+# Tanító és tesztelő adathalmaz ábrázolása
+plot_data_and_predictions(trained_model, train_loader, test_loader, "Training Data and Predictions", "Testing Data and Predictions", train_loss, test_loss)
