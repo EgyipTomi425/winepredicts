@@ -69,8 +69,8 @@ Az első:
 
  A harmadik hasonló volt a másodikhoz azzal a kivétellel, hogy ott megvizsgáltuk milyen ha 3 layer van és 100-as értéken (raito továbbra is 0.125). Az alap beállításos eredmények azok test 9.78% és train 7.98% viszont az epoch növelésével ez eredményezte a legjobbat. A train részén 4.77%-ra javult valamint a "+-" rész a korábbi 10% -ról  4.69%-re csökkent. Így kimondhatjuk, hogy a legjobb eredményt a harmadik mély tanulás hozta ezen beallításokkal.
 
- ![dl2testerror.png](pictures/dl3-testerror.png)
- ![dl2trainerror.png](pictures/dl3-trainerror.png)
+ ![dl3testerror.png](pictures/dl3-testerror.png)
+ ![dl3trainerror.png](pictures/dl3-trainerror.png)
 
  Az alábbi képen látható az eredmény fül:
 
@@ -102,7 +102,7 @@ Ezen felül még készítettünk két döntési fát a modellekről az "accuracy
 
  A jó modell (Lrelu), optimalizálás után megpróbáltunk megfelelő számú paramétert kinyerni utána ebből további featureket kinyerni. Ez lett a legjobb eredmény, test loss: 0.3572
  
- ![sigm-bad.png](pictures/sigm-bad.png)
+ ![relu.png](pictures/good-model.png)
 
  TANH rejtett réteg
 
